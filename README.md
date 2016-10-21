@@ -2,7 +2,7 @@
 
 ## DateTools
 
-DateTools was written to streamline date and time handling in Objective-C. Classes and concepts from other languages served as an inspiration for DateTools, especially the [DateTime](http://msdn.microsoft.com/en-us/library/system.datetime(v=vs.110).aspx) structure and [Time Period Library](http://www.codeproject.com/Articles/168662/Time-Period-Library-for-NET) for .NET. Through these classes and others, DateTools removes the boilerplate required to access date components, handles more nuanced date comparisons, and serves as the foundation for entirely new concepts like Time Periods and their collections.
+DateTools was orgininally written to streamline date and time handling in Objective-C. That same funcionality and more is now available in Swift3. Classes and concepts from other languages served as an inspiration for DateTools, especially the [DateTime](http://msdn.microsoft.com/en-us/library/system.datetime(v=vs.110).aspx) structure and [Time Period Library](http://www.codeproject.com/Articles/168662/Time-Period-Library-for-NET) for .NET. Through these classes and others, DateTools removes the boilerplate required to access date components, handles more nuanced date comparisons, and serves as the foundation for entirely new concepts like Time Chunks, Time Periods and their collections.
 
 [![Build Status](https://travis-ci.org/MatthewYork/DateTools.svg?branch=master)](https://travis-ci.org/MatthewYork/DateTools)
 [![CocoaPods](https://cocoapod-badges.herokuapp.com/v/DateTools/badge.png)](http://cocoapods.org/?q=datetools)
@@ -80,22 +80,56 @@ The following bundle is necessary if you would like to support internationalizat
 * [**Credits**](#credits)
 * [**License**](#license)
 
-##NSDate+DateTools
+##Time Chunks
 
-One of the missions of DateTools was to make NSDate feel more complete. There are many other languages that allow direct access to information about dates from their date classes, but NSDate (sadly) does not. It safely works only in the Unix time offsets through the <code>timeIntervalSince...</code> methods for building dates and remains calendar agnostic. But that's not <i>always</i> what we want to do. Sometimes, we want to work with dates based on their date components (like year, month, day, etc) at a more abstract level. This is where DateTools comes in.
+The biggest change in the Swift version of DateTools is the concept of `TimeChunk`s. They're lightweight objects that can be added or subtracted from dates to make your date operations more readable. Each chunk holds a variable for each of the most common date components: years, months, days, weeks, hours, minutes, seconds. They also work with Integers to make their creation simple: `let chunk = 2.days`. It's then very easy to adjust a date like so:
 
-####Time Ago
+```swift
+// Initialize the Date that was 5 days ago from now.
+let date = Date() - 5.days
+// An even more convenient way.
+5.days.earlier
+// Easily operate on custom dates.
+2.months.later(than date: myDate)
+```
 
-No date library would be complete without the ability to quickly make an NSString based on how much earlier a date is than now. DateTools has you covered. These "time ago" strings come in a long and short form, with the latter closely resembling Twitter. You can get these strings like so:
+It's best to think of `TimeChunk`s as "fuzzy" time, rather than a strict period of seconds. Most units of time can be given and converted in a strict manner (1 minute = 60 seconds, 1 day = 24 hours), but months only make sense as a strict unit of time given the context of a reference date. It is possible to make some conversions from `TimeChunk`s to a strict Integer, but other times it doesn't make sense:
 
-```objc
-NSDate *timeAgoDate = [NSDate dateWithTimeIntervalSinceNow:-4];
-NSLog(@"Time Ago: %@", timeAgoDate.timeAgoSinceNow);
-NSLog(@"Time Ago: %@", timeAgoDate.shortTimeAgoSinceNow);
+```swift
+print(4.days.to(.hours))
+// 96
 
-//Output:
-//Time Ago: 4 seconds ago
-//Time Ago: 4s
+print(4.months.to(days))
+// Months are not supported for conversion due to their uncertain number of days.
+// 0
+
+print(1.years.to(.days)) // Years are always taken to mean a period of 365 days.
+// 365
+```
+
+It's also possible to chain chunk operations together for more complicated operations or `TimeChunk` objects:
+
+```swift
+let date = Date() + 1.years + 2.months - 4.days + -3.hours
+let chunk = 3.years + 4.months
+```
+
+##Date Extensions
+
+One of the missions of DateTools was to make the Date class feel more complete. There are many other languages that allow direct access to information about dates from their date classes, but Date in Swift (sadly) does not. It safely works only in the Unix time offsets through the <code>timeIntervalSince...</code> methods for building dates and remains calendar agnostic. But that's not <i>always</i> what we want to do. Sometimes, we want to work with dates based on their date components (like year, month, day, etc) at a more abstract level. This is where DateTools comes in.
+
+####Date+TimeAgo
+
+No date library would be complete without the ability to quickly make an String based on how much earlier a date is than now. DateTools has you covered. These "time ago" strings come in a long and short form, with the latter closely resembling Twitter. You can get these strings like so:
+
+```swift
+let date = Date() - 2.hours
+print(date.timeAgoSinceNow)
+print(date.shortTimeAgoSinceNow + " ago")
+
+// Output:
+// 2 hours ago
+// 2h ago
 ```
 
 Assuming you have added the localization to your project, `DateTools` currently supports the following languages: 
@@ -145,101 +179,107 @@ This project is user driven (by people like you). Pull requests close faster tha
 
 Thanks to Kevin Lawler for his work on [NSDate+TimeAgo](https://github.com/kevinlawler/NSDate-TimeAgo), which has been officially merged into this library.
 
-####Date Components
+####Date+Components
 
-There is a lot of boilerplate associated with getting date components from an NSDate. You have to set up a calendar, use the desired flags for the components you want, and finally extract them out of the calendar. 
+There is a lot of boilerplate associated with getting date components from an Date. You have to set up a calendar, use the desired flags for the components you want, and finally extract them out of the calendar. 
 
 With DateTools, this:
 
-```objc
-//Create calendar
-NSCalendar *calendar = [[NSCalendar alloc] initWithCalendarIdentifier:NSGregorianCalendar];
-unitFlags = NSYearCalendarUnit | NSMonthCalendarUnit;
-NSDateComponents *dateComponents = [calendar components:unitFlags fromDate:date];
+```swift
+// Create calendar
+let calendar = Calendar(identifier: .gregorian)
+let components = calendar.dateComponents([.year, .month], from: date)
 
 //Get components
-NSInteger year = dateComponents.year;
-NSInteger month = dateComponents.month;
+let year = components.year
+let month = components.month
 ```
 
 ...becomes this:
-```objc
-NSInteger year = date.year;
-NSInteger month = date.month;
+```swift
+let year = date.year
+let month = date.month
 ```
 
-And if you would like to use a non-Gregorian calendar, that option is available as well.
-```objc
-NSInteger day = [date dayWithCalendar:calendar];
-```
+We also provide computed variables such as `isToday`, `isTomorrow`, `isYesterday`, and `isWeekend`.
 
-If you would like to override the default calendar that DateTools uses, simply change it in the <code>defaultCalendar</code> method of <code>NSDate+DateTools.m</code>.
+####Date+Manipulations
 
-####Date Editing
-
-The date editing methods in NSDate+DateTools makes it easy to shift a date earlier or later by adding and subtracting date components. For instance, if you would like a date that is 1 year later from a given date, simply call the method <code>dateByAddingYears</code>.
+The date manipulation methods in Date Tools makes it easy to shift a date earlier or later by adding and subtracting `TimeChunk`s as shown in the Time Chunks section above.
 
 With DateTools, this:
-```objc
+```swift
 //Create calendar
-NSCalendar *calendar = [[NSCalendar alloc] initWithCalendarIdentifier:[NSDate defaultCalendar]];
-NSDateComponents *components = [[NSDateComponents alloc] init];
+let calendar = Calendar(identifier: .gregorian)
+var components = calendar.dateComponents([.year], from: date)
 
 //Make changes
-[components setYear:1];
+components.year! += 1
 
 //Get new date with updated year
-NSDate *newDate = [calendar dateByAddingComponents:components toDate:date options:0];
+let newDate = calendar.date(byAdding: .year, value: components.year!, to: date)
 ```
 
 ...becomes this:
-```objc
-NSDate *newDate = [date dateByAddingYears:1];
+```swift
+let newDate = date + 1.year
 ```
 
-Subtraction of date components is also fully supported through the <code>dateBySubtractingYears</code>
+It's now also possible to set a Date to the start or end of a given component like so:
 
-####Date Comparison
+```swift
+// Initialize date to the Date right now.
+let date = Date()
+// Set date to January 1 of this year, at 00:00:00.
+date = date.start(of: year)
+// Set date to the end of the current month (January).
+// This means days, minutes, hours, and seconds will all be set
+// to their max amounts.
+date = date.end(of: .month)
+```
 
-Another mission of the DateTools category is to greatly increase the flexibility of date comparisons. NSDate gives you four basic methods:
-* isEqualToDate:
-* earlierDate:
-* laterDate:
-* compare:
+####Date+Comparators
 
-<code>earlierDate:</code> and <code>laterDate:</code> are great, but it would be nice to have a boolean response to help when building logic in code; to easily ask "is this date earlier than that one?". DateTools has a set of proxy methods that do just that as well as a few other methods for extended flexibility. The new methods are:
-* isEarlierThan
-* isEarlierThanOrEqualTo
-* isLaterThan
-* isLaterThanOrEqualTo
+Another mission of the DateTools category is to greatly increase the flexibility of date comparisons. Date gives you three basic methods:
+* earlierDate(date: Date)
+* laterDate(date: Date)
+* compare(date: Date)
 
-These methods are great for comparing dates in a boolean fashion, but what if we want to compare the dates and return some meaningful information about how far they are apart? NSDate comes with two methods <code>timeIntervalSinceDate:</code> and <code>timeIntervalSinceNow</code> which gives you a <code>double</code> offset representing the number of seconds between the two dates. This is great and all, but there are times when one wants to know how many years or days are between two dates. For this, DateTools goes back to the ever-trusty NSCalendar and abstracts out all the necessary code for you.
+<code>earlierDate</code> and <code>laterDate</code> are great, but it would be nice to have a boolean response to help when building logic in code; to easily ask "is this date earlier than that one?". DateTools has a set of proxy methods that do just that as well as a few other methods for extended flexibility. The new methods are:
+* isEarlier(than: Date)
+* isEarlierThanOrEqual(to: Date)
+* isLater(than: Date)
+* isLaterThanOrEqual(to: Date)
+
+These methods are great for comparing dates in a boolean fashion, but what if we want to compare the dates and return some meaningful information about how far they are apart? Date comes with two methods <code>timeIntervalSince(date: Date)</code> and <code>timeIntervalSinceNow</code> which gives you a `TimeInterval` offset representing the number of seconds between the two dates. This is great and all, but there are times when one wants to know how many years or days are between two dates. For this, DateTools goes back to the ever-trusty NSCalendar and abstracts out all the necessary code for you.
 
 With Date Tools, this:
-```objc
-NSCalendar *calendar = [[NSCalendar alloc] initWithCalendarIdentifier:[NSDate defaultCalendar]];
-NSDate *earliest = [firstDate earlierDate:secondDate];
-NSDate *latest = (secondDate == firstDate) ? secondDate : firstDate;
-NSInteger multiplier = (secondDate == firstDate) ? -1 : 1;
-NSDateComponents *components = [calendar components:allCalendarUnitFlags fromDate:earliest toDate:latest options:0];
-NSInteger yearsApart = multiplier*(components.month + 12*components.year);
+```swift
+let calendar = Calendar(identifier: .gregorian)
+let earliest = firstDate.earlierDate(secondDate)
+let latest = (secondDate == earliest) ? secondDate : firstDate;
+let multiplier = (secondDate == earliest) ? -1 : 1;
+var components = calendar.dateComponents([.year, .month], from: earliest, to: latest)
+let yearsApart = multiplier*(components.month + 12*components.year);
 ```
-..becomes this:
-```objc
-NSInteger yearsApart = [firstDate yearsFrom:secondDate];
+...becomes this:
+```swift
+let monthsApart = firstDate.months(from: secondDate)
 ```
 Methods for comparison in this category include:
-* <code>yearsFrom:</code>, <code>yearsUntil</code>, <code>yearsAgo</code>, <code>yearsEarlierThan:</code>, <code>yearsLaterThan:</code>
-* <code>monthsFrom:</code>, <code>monthsUntil</code>, <code>monthsAgo</code>, <code>monthsEarlierThan:</code>, <code>monthsLaterThan:</code>
-* <code>weeksFrom:</code>, <code>weeksUntil</code>, <code>weeksAgo</code>, <code>weeksEarlierThan:</code>, <code>weeksLaterThan:</code>
-* <code>daysFrom:</code>, <code>daysUntil</code>, <code>daysAgo</code>, <code>daysEarlierThan:</code>, <code>daysLaterThan:</code>
-* <code>hoursFrom:</code>, <code>hoursUntil</code>, <code>hoursAgo</code>, <code>hoursEarlierThan:</code>, <code>hoursLaterThan:</code>
-* <code>minutesFrom:</code>, <code>minutesUntil</code>, <code>minutesAgo</code>, <code>minutesEarlierThan:</code>, <code>minutesLaterThan:</code>
-* <code>secondsFrom:</code>, <code>secondsUntil</code>, <code>secondsAgo</code>, <code>secondsEarlierThan:</code>, <code>secondsLaterThan:</code>
+* <code>years(from: Date)</code>, <code>yearsUntil</code>, <code>yearsAgo</code>, <code>yearsEarlier(than: Date)</code>, <code>yearsLater(than: Date)</code>
+* <code>months(from: Date)</code>, <code>monthsUntil</code>, <code>monthsAgo</code>, <code>monthsEarlier(than: Date)</code>, <code>monthsLater(than: Date)</code>
+* <code>weeks(from: Date):</code>, <code>weeksUntil</code>, <code>weeksAgo</code>, <code>weeksEarlier(than: Date)</code>, <code>weeksLater(than: Date)</code>
+* <code>days(from: Date)</code>, <code>daysUntil</code>, <code>daysAgo</code>, <code>daysEarlier(than: Date)</code>, <code>daysLater(than: Date)</code>
+* <code>hours(from: Date)</code>, <code>hoursUntil</code>, <code>hoursAgo</code>, <code>hoursEarlier(than: Date)</code>, <code>hoursLater(than: Date)</code>
+* <code>minutes(from: Date)</code>, <code>minutesUntil</code>, <code>minutesAgo</code>, <code>minutesEarlier(than: Date)</code>, <code>minutesLater(than: Date)</code>
+* <code>seconds(from: Date)</code>, <code>secondsUntil</code>, <code>secondsAgo</code>, <code>secondsEarlier(than: Date)</code>, <code>secondsLater(than: Date)</code>
+
+We are also introducing a method called `chunkBetween`. `firstDate.chunkBetween(date: secondDate)` will return a `TimeChunk` with all positive variables for a `secondDate` in the future, and one with all negative variables for a `secondDate` in the past. Variables roll over when they become the size of the next variables up (e.g. 75 seconds would be converted to 1 minute, 15 seconds).
 
 ####Formatted Date Strings
 
-Just for kicks, DateTools has a few convenience methods for quickly creating strings from dates. Those two methods are <code>formattedDateWithStyle:</code> and <code>formattedDateWithFormat:</code>. The current locale is used unless otherwise specified by additional method parameters. Again, just for kicks, really.
+Just for kicks, DateTools has a few convenience methods for quickly creating strings from dates. Those two methods are <code>formatted(with dateStyle: )</code> and <code>formatted(with dateFormat: )</code>. The current locale and time zone are used unless otherwise specified by additional method parameters. Again, just for kicks, really.
 
 ##Time Periods
 
@@ -288,6 +328,8 @@ This doubles a time period of duration 1 minute to duration 2 minutes. The end d
 ####Relationships
 
 There may come a need, say when you are making a scheduling app, when it might be good to know how two time periods relate to one another. Are they the same? Is one inside of another? All these questions may be asked using the relationship methods of DTTimePeriod.
+
+**The Basics**
 
 Below is a chart of all the possible relationships between two time periods:
 ![TimePeriods](https://raw.githubusercontent.com/MatthewYork/Resources/master/DateTools/PeriodRelations.png)
